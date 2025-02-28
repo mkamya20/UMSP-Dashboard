@@ -1,0 +1,3412 @@
+---
+title: "UMSP Dashboard"
+author: "UMSP Dashboard team builders (Moses, Isaiah, Eric and Shakira)"
+date: "2025-02-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Clear everything from the environment
+
+```{r}
+
+rm(list = ls(all.names = TRUE)) #clear all objects including hidden objects.
+
+```
+
+
+
+## Set working directory
+
+```{r}
+
+setwd("E:/bbrsh/Desktop/Shakira/IDRC/Projects/UMSP dashboards")
+
+```
+
+
+## Load the necessary libraries
+
+```{r}
+
+library(readstata13)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(rstatix)  
+library(ggpubr)   
+library(purrr)  
+library(markdown)
+# rmarkdown::render("Packages_needed.Rmd")
+library(Hmisc)
+library(renv)
+library(here)
+library(haven)
+library(gt)
+library(forecast) 
+library(tseries) 
+library(ggplot2)
+library(gtsummary)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(shiny)
+library(plotly)
+library(shinythemes)  
+
+
+```
+
+
+
+
+# Load data
+
+```{r}
+
+UMSP_data <-  read.dta13("E:/bbrsh/Desktop/Shakira/IDRC/Projects/UMSP dashboards/Monthly data for all sites through December 2024.dta", 
+                   convert.factors = TRUE, generate.factors = TRUE,
+                   encoding = "UTF-8", fromEncoding = NULL, convert.underscore = FALSE,
+                   missing.type = TRUE, convert.dates = TRUE, replace.strl = TRUE,
+                   add.rownames = FALSE, nonint.factors = TRUE, select.rows = NULL,
+                   select.cols = NULL, strlexport = FALSE, strlpath = ".")
+
+
+```
+
+# Malaria incidence per region per month per year
+
+```{r}
+
+UMSP_data %>%
+  dplyr::select(monthyear,Region,malinc) %>%
+  View()
+
+table(UMSP_data$Region)
+
+
+
+ggplot(UMSP_data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +
+  geom_line() + 
+  labs(
+    title = "Malaria Incidence per Region per Month per Year",
+    x = "Month-Year",
+    y = "Malaria Incidence"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c("blue", "red", "green", "orange", "purple", "yellow", "cyan", "pink", "brown")) +
+  theme(legend.title = element_blank())
+
+
+
+```
+
+
+
+
+```{r}
+
+# Line plot with data points shown
+ggplot(UMSP_data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +
+  geom_line(size = 1.2) + 
+  labs(
+    title = "Malaria Incidence per Region per Month per Year",
+    x = "Month-Year",
+    y = "Malaria Incidence"
+  ) +
+  scale_color_brewer(palette = "Set2") +  # A nice color palette
+  theme_minimal(base_size = 15) +  # Clean background with larger text size
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotating x-axis labels for better readability
+    axis.title.x = element_text(margin = margin(t = 10)),  # Adding space between x-axis and labels
+    axis.title.y = element_text(margin = margin(r = 10)),  # Adding space between y-axis and labels
+    legend.title = element_blank(),  # Removing legend title for clarity
+    legend.position = "bottom"  # Moving the legend to the bottom for better space management
+  ) +
+  geom_point(aes(color = Region), size = 2) +  # Add points to highlight specific values
+  guides(color = guide_legend(ncol = 2))  # Adjust legend layout for better readability
+
+
+```
+
+
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer) 
+
+UMSP_data_Bunyoro_region = UMSP_data %>%
+  filter(Region=="Bunyoro")
+
+# Line plot for Bunyoro region only
+ggplot(UMSP_data_Bunyoro_region, aes(x = monthyear, y = malinc, color = Region, group = Region)) +
+  geom_line(size = 1.2) + 
+  labs(
+    title = "Malaria Incidence per Region per Month per Year",
+    x = "Month-Year",
+    y = "Malaria Incidence"
+  ) +
+  scale_color_brewer(palette = "Set2") +  # A nice color palette
+  theme_minimal(base_size = 15) +  # Clean background with larger text size
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotating x-axis labels for better readability
+    axis.title.x = element_text(margin = margin(t = 10)),  # Adding space between x-axis and labels
+    axis.title.y = element_text(margin = margin(r = 10)),  # Adding space between y-axis and labels
+    legend.title = element_blank(),  # Removing legend title for clarity
+    legend.position = "bottom"  # Moving the legend to the bottom for better space management
+  ) +
+  geom_point(aes(color = Region), size = 2) +  # Add points to highlight specific values
+  guides(color = guide_legend(ncol = 2))  # Adjust legend layout for better readability
+
+
+```
+
+
+
+#################################################################################################################
+#################################################################################################################
+#################################################################################################################
+
+# Build a simple dashboard for malaria incidenec with slides of region
+
+
+```{r}
+
+
+# UI for the Shiny app
+ui <- fluidPage(
+  titlePanel("Malaria Incidence per Region"),
+  
+  # Sidebar layout for sliders and plot
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("region", "Select Region(s):", 
+                  choices = c("All Regions", 
+                              "North Buganda / Tooro", 
+                              "Bunyoro", 
+                              "West Nile", 
+                              "Acholi", 
+                              "Lango", 
+                              "Teso / Karamoja", 
+                              "Busoga / Bukedi", 
+                              "Kigezi", 
+                              "Rwenzori"), 
+                  selected = "All Regions", 
+                  multiple = TRUE),
+      
+      selectInput("year", "Select Year:", 
+                  choices = c("All Years", unique(as.character(format(UMSP_data$monthyear, "%Y")))), 
+                  selected = "All Years")
+    ),
+    
+    mainPanel(
+      plotlyOutput("malariaPlot")  # Changed to plotlyOutput for interactive plot
+    )
+  )
+)
+
+# Server function for the Shiny app
+server <- function(input, output) {
+  
+  filtered_data <- reactive({
+    data <- UMSP_data
+    
+    if ("All Regions" %in% input$region) {
+      data <- data
+    } else {
+      data <- data %>% filter(Region %in% input$region)
+    }
+    
+    if (input$year != "All Years") {
+      data <- data %>% filter(format(monthyear, "%Y") == input$year)
+    }
+    
+    return(data)
+  })
+  
+  output$malariaPlot <- renderPlotly({
+    data <- filtered_data()
+    
+    # Extract Month and Year for the hover tooltips
+    data <- data %>%
+      mutate(
+        Year = format(monthyear, "%Y"),
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)
+      )
+    
+    # Create the ggplot object
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +
+      geom_line(size = 1.2) + 
+      labs(
+        title = paste("Malaria Incidence", 
+                      ifelse(input$year == "All Years", "", paste("for", input$year)), 
+                      ifelse(input$region[1] == "All Regions", "", paste("in", paste(input$region, collapse = ", ")))),
+        x = "Month-Year",
+        y = "Malaria Incidence"
+      ) +
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) + 
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        legend.title = element_blank(),
+        legend.position = "bottom"
+      ) +
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)
+      aes(text = paste("Region: ", Region, 
+                       "<br>", "Month: ", Month,
+                       "<br>", "Year: ", Year, 
+                       "<br>", "Malaria Incidence: ", malinc))
+    
+    # Convert ggplot object to plotly and customize hover info
+    ggplotly(plot, tooltip = "text")
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
+
+```
+
+
+# Have an opportunity to choose different years as well
+
+```{r}
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- fluidPage(  
+  titlePanel("Malaria Incidence per Region"),  
+  
+  # Sidebar layout for sliders and plot  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE)  # Allow selecting multiple years  
+    ),  
+    
+    mainPanel(  
+      plotlyOutput("malariaPlot")  # Changed to plotlyOutput for interactive plot  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+# Added boxplot and summary statistics
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- fluidPage(  
+  theme = shinytheme("cerulean"),  
+  titlePanel("Malaria Incidence Dashboard"),  
+  
+  # Sidebar layout for sliders and plot  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE),  # Allow selecting multiple years  
+      
+      downloadButton("downloadData", "Download Data"),  
+      downloadButton("downloadPlot", "Download Plot")  
+    ),  
+    
+    mainPanel(  
+      tabsetPanel(  
+        tabPanel("Line Graph", plotlyOutput("malariaPlot")),  
+        tabPanel("Box Plot", plotlyOutput("boxPlot")),  # New tab for box plot  
+        tabPanel("Summary", tableOutput("summary"))  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      facet_wrap(~ Year, scales = "free_x") +  # Independent box plots per year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics  
+  output$summary <- renderTable({  
+    data <- filtered_data()  
+    
+    # Calculate mean (SD) and median (IQR)  
+    summary_stats <- data %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE)  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- data.frame(  
+      Statistic = c("Mean (SD)", "Median (IQR)"),  
+      Value = c(paste0(round(summary_stats$Mean, 2), " (", round(summary_stats$SD, 2), ")"),   
+                paste0(round(summary_stats$Median, 2), " (", round(summary_stats$IQR, 2), ")"))  
+    )  
+    
+    return(summary_stats)  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+
+```
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- fluidPage(  
+  theme = shinytheme("cerulean"),  
+  titlePanel("Malaria Incidence Dashboard"),  
+  
+  # Sidebar layout for sliders and plot  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE),  # Allow selecting multiple years  
+      
+      downloadButton("downloadData", "Download Data"),  
+      downloadButton("downloadPlot", "Download Plot")  
+    ),  
+    
+    mainPanel(  
+      tabsetPanel(  
+        tabPanel("Line Graph", plotlyOutput("malariaPlot")),  
+        tabPanel("Box Plot", plotlyOutput("boxPlot")),  # New tab for box plot  
+        tabPanel("Summary", tableOutput("summary"))  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      facet_wrap(~ Year, scales = "free_x") +  # Independent box plots per year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics  
+  output$summary <- renderTable({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE),  
+        Min = min(malinc, na.rm = TRUE),  
+        Max = max(malinc, na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    return(summary_stats)  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+######################## Better view of the dashboard
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Incidence Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Data Summary", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("malariaPlot"), title = "Malaria Incidence Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution of Malaria Incidence by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      facet_wrap(~ Year, scales = "free_x") +  # Independent box plots per year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE),  
+        Min = min(malinc, na.rm = TRUE),  
+        Max = max(malinc, na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+
+
+```{r}
+
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Incidence Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("malariaPlot"), title = "Malaria Incidence Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution of Malaria Incidence by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      facet_wrap(~ Year, scales = "free_x") +  # Independent box plots per year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE),  
+        Min = min(malinc, na.rm = TRUE),  
+        Max = max(malinc, na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Incidence Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("malariaPlot"), title = "Malaria Incidence Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution of Malaria Incidence by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot(outlier.shape = NA) +  # Remove outliers for cleaner visualization  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_fill_brewer(palette = "Set2") +  # Use a color palette for better differentiation  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Median: ", round(median(malinc, na.rm = TRUE), 2),   
+                       "<br>", "IQR: ", round(IQR(malinc, na.rm = TRUE), 2)))  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE),  
+        Min = min(malinc, na.rm = TRUE),  
+        Max = max(malinc, na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+```
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Incidence Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("malariaPlot"), title = "Malaria Incidence Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution of Malaria Incidence by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot(outlier.shape = NA) +  # Remove outliers for cleaner visualization  
+      facet_wrap(~ Year, scales = "free_x") +  # Facet by Year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_fill_brewer(palette = "Set2") +  # Use a color palette for better differentiation  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom",  
+        panel.spacing = unit(2, "lines")  # Increase spacing between facets  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Median: ", round(median(malinc, na.rm = TRUE), 2),   
+                       "<br>", "IQR: ", round(IQR(malinc, na.rm = TRUE), 2)))  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE),  
+        Min = min(malinc, na.rm = TRUE),  
+        Max = max(malinc, na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+```
+
+
+
+# Now i want to view similar things for different columns in the dataset: malinc, TPR, propsuspected
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("column", "Select Column to Visualize:",   
+                choices = c("Malaria Incidence" = "malinc",   
+                            "Test Positivity Rate (TPR)" = "TPR",   
+                            "Proportion Suspected" = "propsuspected"),   
+                selected = "malinc"),  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("linePlot"), title = "Trend Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$linePlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = .data[[input$column]], color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste(input$column,   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = input$column  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", input$column, ": ", .data[[input$column]]))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = .data[[input$column]], fill = Year)) +  
+      geom_boxplot(outlier.shape = NA) +  # Remove outliers for cleaner visualization  
+      facet_wrap(~ Year, scales = "free_x") +  # Facet by Year  
+      labs(  
+        title = paste("Distribution of", input$column, "by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = input$column  
+      ) +  
+      scale_fill_brewer(palette = "Set2") +  # Use a color palette for better differentiation  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom",  
+        panel.spacing = unit(2, "lines")  # Increase spacing between facets  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Median: ", round(median(.data[[input$column]], na.rm = TRUE), 2),   
+                       "<br>", "IQR: ", round(IQR(.data[[input$column]], na.rm = TRUE), 2)))  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(.data[[input$column]], na.rm = TRUE),  
+        SD = sd(.data[[input$column]], na.rm = TRUE),  
+        Median = median(.data[[input$column]], na.rm = TRUE),  
+        IQR = IQR(.data[[input$column]], na.rm = TRUE),  
+        Min = min(.data[[input$column]], na.rm = TRUE),  
+        Max = max(.data[[input$column]], na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+```
+
+
+# With bslib (Outside this scope)
+
+```{r}
+
+# https://rstudio.github.io/bslib/articles/tooltips-popovers/index.html
+
+library(shiny)
+library(bslib)
+library(palmerpenguins)
+library(ggplot2)
+library(bsicons)
+library(ggridges)
+
+ui <- page_fillable(
+  card(
+    card_header(
+      "Penguin body mass",
+      tooltip(
+        bsicons::bs_icon("question-circle"),
+        "Mass measured in grams.",
+        placement = "right"
+      ),
+      popover(
+        bsicons::bs_icon("gear", class = "ms-auto"),
+        selectInput("yvar", "Split by", c("sex", "species", "island")),
+        selectInput("color", "Color by", c("species", "island", "sex"), "island"),
+        title = "Plot settings"
+      ),
+      class = "d-flex align-items-center gap-1"
+    ),
+    plotOutput("plt"),
+    card_footer(
+      "Source: Gorman KB, Williams TD, Fraser WR (2014).",
+      popover(
+        a("Learn more", href = "#"),
+        markdown(
+          "Originally published in: Gorman KB, Williams TD, Fraser WR (2014) Ecological Sexual Dimorphism and Environmental Variability within a Community of Antarctic Penguins (Genus Pygoscelis). PLoS ONE 9(3): e90081. [doi:10.1371/journal.pone.0090081](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0090081)"
+        )
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  output$plt <- renderPlot({
+    ggplot(penguins, aes(x = body_mass_g, y = !!sym(input$yvar), fill = !!sym(input$color))) +
+      ggridges::geom_density_ridges(scale = 0.9, alpha = 0.5) +
+      coord_cartesian(clip = "off") +
+      labs(x = NULL, y = NULL) +
+      ggokabeito::scale_fill_okabe_ito() +
+      theme_minimal(base_size = 20) +
+      theme(legend.position = "top")
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
+
+
+
+
+
+# Can i now just hoover over any column that I want from the dataset?
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  # For enhanced data tables  
+
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("column", "Select Column to Visualize:",   
+                choices = names(UMSP_data),  # Dynamically populate choices from dataset columns  
+                selected = "malinc"),  # Default to "malinc"  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("linePlot"), title = "Trend Over Time", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$linePlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = .data[[input$column]], color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste(input$column,   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = input$column  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", input$column, ": ", .data[[input$column]]))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = .data[[input$column]], fill = Year)) +  
+      geom_boxplot(outlier.shape = NA) +  # Remove outliers for cleaner visualization  
+      facet_wrap(~ Year, scales = "free_x") +  # Facet by Year  
+      labs(  
+        title = paste("Distribution of", input$column, "by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = input$column  
+      ) +  
+      scale_fill_brewer(palette = "Set2") +  # Use a color palette for better differentiation  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom",  
+        panel.spacing = unit(2, "lines")  # Increase spacing between facets  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Median: ", round(median(.data[[input$column]], na.rm = TRUE), 2),   
+                       "<br>", "IQR: ", round(IQR(.data[[input$column]], na.rm = TRUE), 2)))  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(.data[[input$column]], na.rm = TRUE),  
+        SD = sd(.data[[input$column]], na.rm = TRUE),  
+        Median = median(.data[[input$column]], na.rm = TRUE),  
+        IQR = IQR(.data[[input$column]], na.rm = TRUE),  
+        Min = min(.data[[input$column]], na.rm = TRUE),  
+        Max = max(.data[[input$column]], na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+# Live plots
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+library(shinydashboard)  
+library(DT)  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- dashboardPage(  
+  dashboardHeader(title = "Malaria Dashboard", titleWidth = 300),  
+  dashboardSidebar(  
+    width = 300,  
+    sidebarMenu(  
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),  
+      menuItem("Summary Statistics", tabName = "summary", icon = icon("table"))  
+    ),  
+    selectInput("column", "Select Column to Visualize:",   
+                choices = names(UMSP_data),  # Dynamically populate choices from dataset columns  
+                selected = "malinc"),  # Default to "malinc"  
+    selectInput("region", "Select Region(s):",   
+                choices = c("All Regions",   
+                            "North Buganda / Tooro",   
+                            "Bunyoro",   
+                            "West Nile",   
+                            "Acholi",   
+                            "Lango",   
+                            "Teso / Karamoja",   
+                            "Busoga / Bukedi",   
+                            "Kigezi",   
+                            "Rwenzori"),   
+                selected = "All Regions",   
+                multiple = TRUE),  
+    selectInput("year", "Select Year(s):",   
+                choices = c("All Years", unique(UMSP_data$Year)),   
+                selected = "All Years",   
+                multiple = TRUE),  # Allow selecting multiple years  
+    sliderInput("animationSpeed", "Animation Speed (seconds per frame):",   
+                min = 0.1, max = 2, value = 0.5, step = 0.1),  # Control animation speed  
+    actionButton("startAnimation", "Start Animation", class = "btn-primary"),  
+    actionButton("stopAnimation", "Stop Animation", class = "btn-danger"),  
+    downloadButton("downloadData", "Download Data", class = "btn-primary"),  
+    downloadButton("downloadPlot", "Download Plot", class = "btn-success")  
+  ),  
+  dashboardBody(  
+    tabItems(  
+      tabItem(tabName = "dashboard",  
+              fluidRow(  
+                box(width = 12, plotlyOutput("livePlot"), title = "Trend Over Time (Live Animation)", status = "primary", solidHeader = TRUE)  
+              ),  
+              fluidRow(  
+                box(width = 12, plotlyOutput("boxPlot"), title = "Distribution by Region and Year", status = "info", solidHeader = TRUE)  
+              )  
+      ),  
+      tabItem(tabName = "summary",  
+              fluidRow(  
+                box(width = 12, DTOutput("summaryTable"), title = "Summary Statistics", status = "warning", solidHeader = TRUE)  
+              )  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output, session) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Reactive value to track the current time frame for animation  
+  current_frame <- reactiveVal(1)  
+  
+  # Reactive timer for continuous animation  
+  animation_timer <- reactiveTimer(intervalMillis = 500)  # Default interval of 500ms  
+  
+  # Observe the animation timer to update the current frame  
+  observe({  
+    animation_timer()  
+    if (input$startAnimation > 0) {  # Only update if the animation is started  
+      data <- filtered_data()  
+      max_frame <- nrow(data)  
+      current_frame(min(current_frame() + 1, max_frame))  # Increment frame, but don't exceed max  
+    }  
+  })  
+  
+  # Start/Stop Animation  
+  observeEvent(input$startAnimation, {  
+    animation_timer(intervalMillis = input$animationSpeed * 1000)  # Update interval based on slider  
+  })  
+  
+  observeEvent(input$stopAnimation, {  
+    animation_timer(intervalMillis = NULL)  # Stop the timer  
+  })  
+  
+  # Live Plot  
+  output$livePlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Subset data up to the current frame  
+    data_subset <- data[1:current_frame(), ]  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data_subset, aes(x = monthyear, y = .data[[input$column]], color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      geom_point(size = 2) +  
+      labs(  
+        title = paste(input$column,   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = input$column  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", input$column, ": ", .data[[input$column]]))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = .data[[input$column]], fill = Year)) +  
+      geom_boxplot(outlier.shape = NA) +  # Remove outliers for cleaner visualization  
+      facet_wrap(~ Year, scales = "free_x") +  # Facet by Year  
+      labs(  
+        title = paste("Distribution of", input$column, "by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = input$column  
+      ) +  
+      scale_fill_brewer(palette = "Set2") +  # Use a color palette for better differentiation  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom",  
+        panel.spacing = unit(2, "lines")  # Increase spacing between facets  
+      ) +  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Median: ", round(median(.data[[input$column]], na.rm = TRUE), 2),   
+                       "<br>", "IQR: ", round(IQR(.data[[input$column]], na.rm = TRUE), 2)))  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Summary Statistics Table  
+  output$summaryTable <- renderDT({  
+    data <- filtered_data()  
+    
+    # Calculate summary statistics per selected years and regions  
+    summary_stats <- data %>%  
+      group_by(Region, Year) %>%  
+      summarise(  
+        Mean = mean(.data[[input$column]], na.rm = TRUE),  
+        SD = sd(.data[[input$column]], na.rm = TRUE),  
+        Median = median(.data[[input$column]], na.rm = TRUE),  
+        IQR = IQR(.data[[input$column]], na.rm = TRUE),  
+        Min = min(.data[[input$column]], na.rm = TRUE),  
+        Max = max(.data[[input$column]], na.rm = TRUE),  
+        Count = n(),  # Number of observations  
+        .groups = 'drop'  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- summary_stats %>%  
+      mutate(  
+        `Mean (SD)` = paste0(round(Mean, 2), " (", round(SD, 2), ")"),  
+        `Median (IQR)` = paste0(round(Median, 2), " (", round(IQR, 2), ")")  
+      ) %>%  
+      select(Region, Year, `Mean (SD)`, `Median (IQR)`, Min, Max, Count)  
+    
+    # Render the table using DT  
+    datatable(summary_stats, options = list(pageLength = 10, scrollX = TRUE))  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+```
+
+
+
+##############################################################################################################################
+##############################################################################################################################
+##############################################################################################################################
+##############################################################################################################################
+
+# Heat map
+
+```{r, warning=FALSE, message=FALSE}
+
+
+library(dplyr)
+library(lubridate)
+
+# Ensure monthyear is in the Date format
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)
+
+# Extract Month and Year, then create a valid Date
+UMSP_data <- UMSP_data %>%
+  mutate(
+    Year = format(monthyear, "%Y"),
+    Month = format(monthyear, "%m"),  # Extract numeric month (01, 02, ..., 12)
+    MonthYear = as.Date(paste(Year, Month, "01", sep = "-"))  # Create a valid Date format (Year-Month-01)
+  )
+
+# Check the transformed data
+View(UMSP_data)
+
+# Calculate global min and max for consistent color scale
+global_min <- min(UMSP_data$malinc, na.rm = TRUE)
+global_max <- max(UMSP_data$malinc, na.rm = TRUE)
+
+# Create the heatmap using plotly
+heatmap_plot <- plot_ly(
+  data = UMSP_data,
+  x = ~MonthYear,  # Month-Year on the x-axis
+  y = ~Region,     # Region on the y-axis
+  z = ~malinc,     # Malaria Incidence as the fill value
+  type = "heatmap",
+  colors = colorRamp(c("white", "red")),  # Set color scale (white to red)
+  colorbar = list(
+    title = "Malaria Incidence",
+    tickvals = seq(global_min, global_max, length.out = 5)  # Set ticks for colorbar
+  )
+)
+
+# Add layout details
+heatmap_plot <- heatmap_plot %>%
+  layout(
+    title = "Malaria Incidence Heatmap per Region per Month per Year",
+    xaxis = list(
+      title = "Month-Year",
+      tickangle = 45  # Rotate x-axis labels for readability
+    ),
+    yaxis = list(title = "Region"),
+    margin = list(t = 50, b = 100, l = 100, r = 50)  # Adjust margins for better spacing
+  )
+
+# Display the plot
+heatmap_plot
+
+
+
+```
+
+
+
+
+
+```{r}
+
+library(shiny)  
+library(dplyr)  
+library(lubridate)  
+library(plotly)  
+
+# Sample data preprocessing (assuming UMSP_data is already loaded and pre-processed)  
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Month and Year, then create a valid Date  
+UMSP_data <- UMSP_data %>%  
+  mutate(  
+    Year = format(monthyear, "%Y"),  
+    Month = format(monthyear, "%m"),  # Extract numeric month (01, 02, ..., 12)  
+    MonthYear = as.Date(paste(Year, Month, "01", sep = "-"))  # Create a valid Date format (Year-Month-01)  
+  )  
+
+# Define UI for the Shiny app  
+ui <- fluidPage(  
+  titlePanel("Malaria Incidence Heatmap"),  
+  
+  sidebarLayout(  
+    sidebarPanel(  
+      # Multiple regions selection with specific region names  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      # Select Year (optional)  
+      selectInput("year", "Select Year:",   
+                  choices = c("All Years", unique(as.character(format(UMSP_data$monthyear, "%Y")))),   
+                  selected = "All Years")  
+    ),  
+    
+    mainPanel(  
+      plotlyOutput("heatmapPlot")  
+    )  
+  )  
+)  
+
+# Define server logic for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive data based on selected filters  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Debugging: print the selected region and year  
+    print(paste("Selected regions:", input$region))  
+    print(paste("Selected year:", input$year))  
+    
+    # If "All Regions" is selected, show all regions  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      # Filter by selected regions (excluding "All Regions")  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year  
+    if (input$year != "All Years") {  
+      data <- data %>% filter(format(monthyear, "%Y") == input$year)  
+    }  
+    
+    # Debugging: check if the filtered data has any rows  
+    print(paste("Filtered data rows:", nrow(data)))  
+    
+    # Check if the filtered data is empty  
+    if (nrow(data) == 0) {  
+      print("No data available for selected filters!")  
+      return(NULL)  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Render the heatmap plot  
+  output$heatmapPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Check if filtered data is NULL  
+    if (is.null(data)) {  
+      print("No data to plot!")  
+      return(NULL)  
+    }  
+    
+    # Print first few rows of the data to debug  
+    print(head(data))  
+    
+    # Calculate global min and max for consistent color scale  
+    global_min <- min(UMSP_data$malinc, na.rm = TRUE)  
+    global_max <- max(UMSP_data$malinc, na.rm = TRUE)  
+    
+    # Create the heatmap using plotly  
+    heatmap_plot <- plot_ly(  
+      data = data,  
+      x = ~MonthYear,  # Month-Year on the x-axis  
+      y = ~Region,     # Region on the y-axis  
+      z = ~malinc,     # Malaria Incidence as the fill value  
+      type = "heatmap",  
+      colors = colorRamp(c("white", "red")),  # Set color scale (white to red)  
+      colorbar = list(  
+        title = "Malaria Incidence",  
+        tickvals = seq(global_min, global_max, length.out = 5)  # Set ticks for colorbar  
+      )  
+    )  
+    
+    # Add layout details  
+    heatmap_plot <- heatmap_plot %>%  
+      layout(  
+        title = "Malaria Incidence Heatmap per Region per Month per Year",  
+        xaxis = list(  
+          title = "Month-Year",  
+          tickangle = 45  # Rotate x-axis labels for readability  
+        ),  
+        yaxis = list(title = "Region"),  
+        margin = list(t = 50, b = 100, l = 100, r = 50)  # Adjust margins for better spacing  
+      )  
+    
+    heatmap_plot  
+  })  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+```{r}
+
+library(shiny)  
+library(dplyr)  
+library(lubridate)  
+library(plotly)  
+
+# Sample data preprocessing (assuming UMSP_data is already loaded and pre-processed)  
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Month and Year, then create a valid Date  
+UMSP_data <- UMSP_data %>%  
+  mutate(  
+    Year = format(monthyear, "%Y"),  
+    Month = format(monthyear, "%m"),  # Extract numeric month (01, 02, ..., 12)  
+    MonthYear = as.Date(paste(Year, Month, "01", sep = "-"))  # Create a valid Date format (Year-Month-01)  
+  )  
+
+# Define UI for the Shiny app  
+ui <- fluidPage(  
+  titlePanel("Malaria Incidence Heatmap"),  
+  
+  sidebarLayout(  
+    sidebarPanel(  
+      # Multiple regions selection with specific region names  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      # Select Year (optional, with multiple selection enabled)  
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(as.character(format(UMSP_data$monthyear, "%Y")))),   
+                  selected = "All Years",   
+                  multiple = TRUE)  
+    ),  
+    
+    mainPanel(  
+      plotlyOutput("heatmapPlot")  
+    )  
+  )  
+)  
+
+# Define server logic for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive data based on selected filters  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Debugging: print the selected region and year  
+    print(paste("Selected regions:", input$region))  
+    print(paste("Selected years:", input$year))  
+    
+    # If "All Regions" is selected, show all regions  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      # Filter by selected regions (excluding "All Regions")  
+      data <- data %>% filter(Region %in% input$region)  
+      # Debugging: print the filtered regions  
+      print(paste("Filtered regions:", unique(data$Region)))  
+    }  
+    
+    # Filter by selected year(s)  
+    if (!"All Years" %in% input$year) {  
+      data <- data %>% filter(Year %in% input$year)  
+    }  
+    
+    # Debugging: check if the filtered data has any rows  
+    print(paste("Filtered data rows:", nrow(data)))  
+    
+    # Check if the filtered data is empty  
+    if (nrow(data) == 0) {  
+      print("No data available for selected filters!")  
+      return(NULL)  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Render the heatmap plot  
+  output$heatmapPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Check if filtered data is NULL  
+    if (is.null(data)) {  
+      print("No data to plot!")  
+      return(NULL)  
+    }  
+    
+    # Print first few rows of the data to debug  
+    print(head(data))  
+    
+    # Calculate global min and max for consistent color scale  
+    global_min <- min(UMSP_data$malinc, na.rm = TRUE)  
+    global_max <- max(UMSP_data$malinc, na.rm = TRUE)  
+    
+    # Create the heatmap using plotly  
+    heatmap_plot <- plot_ly(  
+      data = data,  
+      x = ~MonthYear,  # Month-Year on the x-axis  
+      y = ~Region,     # Region on the y-axis  
+      z = ~malinc,     # Malaria Incidence as the fill value  
+      type = "heatmap",  
+      colors = colorRamp(c("white", "red")),  # Set color scale (white to red)  
+      colorbar = list(  
+        title = "Malaria Incidence",  
+        tickvals = seq(global_min, global_max, length.out = 5)  # Set ticks for colorbar  
+      )  
+    )  
+    
+    # Add layout details  
+    heatmap_plot <- heatmap_plot %>%  
+      layout(  
+        title = "Malaria Incidence Heatmap per Region per Month per Year",  
+        xaxis = list(  
+          title = "Month-Year",  
+          tickangle = 45  # Rotate x-axis labels for readability  
+        ),  
+        yaxis = list(title = "Region"),  
+        margin = list(t = 50, b = 100, l = 100, r = 50)  # Adjust margins for better spacing  
+      )  
+    
+    heatmap_plot  
+  })  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+# Other plots
+
+```{r}
+
+ggplot(UMSP_data, aes(x = Month, y = malinc, fill = Year)) +  
+  geom_bar(stat = "identity", position = "dodge") +  
+  labs(title = "Monthly Malaria Incidence by Year", x = "Month", y = "Malaria Incidence")  
+
+```
+
+
+
+# Boxplot
+
+```{r}
+
+ggplot(UMSP_data, aes(x = Region, y = malinc, fill = Year)) +  
+  geom_boxplot() +  
+  labs(title = "Distribution of Malaria Incidence by Region and Year", x = "Region", y = "Malaria Incidence")
+
+```
+
+
+# Areachart plot
+
+```{r}
+
+ggplot(UMSP_data, aes(x = monthyear, y = malinc, fill = Region)) +  
+  geom_area() +  
+  labs(title = "Cumulative Malaria Incidence Over Time", x = "Month-Year", y = "Cumulative Incidence")
+
+```
+
+
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+
+# UI  
+ui <- fluidPage(  
+  theme = shinytheme("cerulean"),  
+  titlePanel("Malaria Incidence Dashboard"),  
+  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions", "North Buganda / Tooro", "Bunyoro", "West Nile", "Acholi", "Lango", "Teso / Karamoja", "Busoga / Bukedi", "Kigezi", "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE),  
+      downloadButton("downloadData", "Download Data"),  
+      downloadButton("downloadPlot", "Download Plot")  
+    ),  
+    
+    mainPanel(  
+      tabsetPanel(  
+        tabPanel("Line Graph", plotlyOutput("malariaPlot")),  
+        tabPanel("Bar Chart", plotlyOutput("barPlot")),  
+        tabPanel("Summary", tableOutput("summary"))  
+      )  
+    )  
+  )  
+)  
+
+# Server  
+server <- function(input, output) {  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  
+    }  
+    
+    return(data)  
+  })  
+  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    ggplotly(ggplot(data, aes(x = monthyear, y = malinc, color = Region)) +  
+               geom_line() +  
+               labs(title = "Malaria Incidence Over Time", x = "Month-Year", y = "Malaria Incidence"))  
+  })  
+  
+  output$barPlot <- renderPlotly({  
+    data <- filtered_data()  
+    ggplotly(ggplot(data, aes(x = Month, y = malinc, fill = Year)) +  
+               geom_bar(stat = "identity", position = "dodge") +  
+               labs(title = "Monthly Malaria Incidence by Year", x = "Month", y = "Malaria Incidence"))  
+  })  
+  
+  output$summary <- renderTable({  
+    data <- filtered_data()  
+    summary(data$malinc)  
+  })  
+  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the app  
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- fluidPage(  
+  theme = shinytheme("cerulean"),  
+  titlePanel("Malaria Incidence Dashboard"),  
+  
+  # Sidebar layout for sliders and plot  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE),  # Allow selecting multiple years  
+      
+      downloadButton("downloadData", "Download Data"),  
+      downloadButton("downloadPlot", "Download Plot")  
+    ),  
+    
+    mainPanel(  
+      tabsetPanel(  
+        tabPanel("Line Graph", plotlyOutput("malariaPlot")),  
+        tabPanel("Bar Chart", plotlyOutput("barPlot")),  
+        tabPanel("Box Plot", plotlyOutput("boxPlot")),  # New tab for box plot  
+        tabPanel("Summary", tableOutput("summary"))  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Bar Chart  
+  output$barPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Month, y = malinc, fill = Year)) +  
+      geom_bar(stat = "identity", position = "dodge") +  
+      labs(  
+        title = paste("Monthly Malaria Incidence by Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics  
+  output$summary <- renderTable({  
+    data <- filtered_data()  
+    
+    # Calculate mean (SD) and median (IQR)  
+    summary_stats <- data %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE)  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- data.frame(  
+      Statistic = c("Mean (SD)", "Median (IQR)"),  
+      Value = c(paste0(round(summary_stats$Mean, 2), " (", round(summary_stats$SD, 2), ")"),   
+                paste0(round(summary_stats$Median, 2), " (", round(summary_stats$IQR, 2), ")"))  
+    )  
+    
+    return(summary_stats)  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+```
+
+
+
+
+```{r}
+
+library(shiny)  
+library(ggplot2)  
+library(dplyr)  
+library(plotly)  
+library(shinythemes)  
+
+# Sample Data (replace with your actual UMSP_data)  
+# UMSP_data <- read.csv("your_data.csv")  # Load your dataset here if not already loaded  
+
+# Ensure monthyear is in the Date format  
+UMSP_data$monthyear <- as.Date(UMSP_data$monthyear)  
+
+# Clean up the Region column by trimming whitespace  
+UMSP_data$Region <- trimws(UMSP_data$Region)  
+
+# Extract Year for filtering  
+UMSP_data <- UMSP_data %>%  
+  mutate(Year = format(monthyear, "%Y"))  
+
+# UI for the Shiny app  
+ui <- fluidPage(  
+  theme = shinytheme("cerulean"),  
+  titlePanel("Malaria Incidence Dashboard"),  
+  
+  # Sidebar layout for sliders and plot  
+  sidebarLayout(  
+    sidebarPanel(  
+      selectInput("region", "Select Region(s):",   
+                  choices = c("All Regions",   
+                              "North Buganda / Tooro",   
+                              "Bunyoro",   
+                              "West Nile",   
+                              "Acholi",   
+                              "Lango",   
+                              "Teso / Karamoja",   
+                              "Busoga / Bukedi",   
+                              "Kigezi",   
+                              "Rwenzori"),   
+                  selected = "All Regions",   
+                  multiple = TRUE),  
+      
+      selectInput("year", "Select Year(s):",   
+                  choices = c("All Years", unique(UMSP_data$Year)),   
+                  selected = "All Years",   
+                  multiple = TRUE),  # Allow selecting multiple years  
+      
+      downloadButton("downloadData", "Download Data"),  
+      downloadButton("downloadPlot", "Download Plot")  
+    ),  
+    
+    mainPanel(  
+      tabsetPanel(  
+        tabPanel("Line Graph", plotlyOutput("malariaPlot")),  
+        tabPanel("Box Plot", plotlyOutput("boxPlot")),  # New tab for box plot  
+        tabPanel("Summary", tableOutput("summary"))  
+      )  
+    )  
+  )  
+)  
+
+# Server function for the Shiny app  
+server <- function(input, output) {  
+  
+  # Reactive function to filter data based on user input  
+  filtered_data <- reactive({  
+    data <- UMSP_data  
+    
+    # Filter by region(s)  
+    if ("All Regions" %in% input$region) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Region %in% input$region)  
+    }  
+    
+    # Filter by selected year(s)  
+    if ("All Years" %in% input$year) {  
+      data <- data  
+    } else {  
+      data <- data %>% filter(Year %in% input$year)  # Ensure multiple years are handled correctly  
+    }  
+    
+    return(data)  
+  })  
+  
+  # Line Graph  
+  output$malariaPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Extract Month and Year for the hover tooltips  
+    data <- data %>%  
+      mutate(  
+        Year = format(monthyear, "%Y"),  
+        Month = format(monthyear, "%B")  # Extract Month name (e.g., "January", "February", etc.)  
+      )  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = monthyear, y = malinc, color = Region, group = Region)) +  
+      geom_line(size = 1.2) +   
+      labs(  
+        title = paste("Malaria Incidence",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Month-Year",  
+        y = "Malaria Incidence"  
+      ) +  
+      scale_color_brewer(palette = "Set2") +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      ) +  
+      geom_point(aes(color = Region), size = 2) +  
+      guides(color = guide_legend(ncol = 2)) +  
+      # Custom hover text (show Region, Month, Year, and Malaria Incidence)  
+      aes(text = paste("Region: ", Region,   
+                       "<br>", "Month: ", Month,  
+                       "<br>", "Year: ", Year,   
+                       "<br>", "Malaria Incidence: ", malinc))  
+    
+    # Convert ggplot object to plotly and customize hover info  
+    ggplotly(plot, tooltip = "text")  
+  })  
+  
+  # Box Plot  
+  output$boxPlot <- renderPlotly({  
+    data <- filtered_data()  
+    
+    # Create the ggplot object  
+    plot <- ggplot(data, aes(x = Region, y = malinc, fill = Year)) +  
+      geom_boxplot() +  
+      facet_wrap(~ Year, scales = "free_x") +  # Independent box plots per year  
+      labs(  
+        title = paste("Distribution of Malaria Incidence by Region and Year",   
+                      ifelse("All Years" %in% input$year, "", paste("for", paste(input$year, collapse = ", "))),   
+                      ifelse("All Regions" %in% input$region, "", paste("in", paste(input$region, collapse = ", ")))),  
+        x = "Region",  
+        y = "Malaria Incidence"  
+      ) +  
+      theme_minimal(base_size = 15) +   
+      theme(  
+        axis.text.x = element_text(angle = 45, hjust = 1),  
+        axis.title.x = element_text(margin = margin(t = 10)),  
+        axis.title.y = element_text(margin = margin(r = 10)),  
+        legend.title = element_blank(),  
+        legend.position = "bottom"  
+      )  
+    
+    # Convert ggplot object to plotly  
+    ggplotly(plot)  
+  })  
+  
+  # Summary Statistics  
+  output$summary <- renderTable({  
+    data <- filtered_data()  
+    
+    # Calculate mean (SD) and median (IQR)  
+    summary_stats <- data %>%  
+      summarise(  
+        Mean = mean(malinc, na.rm = TRUE),  
+        SD = sd(malinc, na.rm = TRUE),  
+        Median = median(malinc, na.rm = TRUE),  
+        IQR = IQR(malinc, na.rm = TRUE)  
+      )  
+    
+    # Format the summary table  
+    summary_stats <- data.frame(  
+      Statistic = c("Mean (SD)", "Median (IQR)"),  
+      Value = c(paste0(round(summary_stats$Mean, 2), " (", round(summary_stats$SD, 2), ")"),   
+                paste0(round(summary_stats$Median, 2), " (", round(summary_stats$IQR, 2), ")"))  
+    )  
+    
+    return(summary_stats)  
+  })  
+  
+  # Download Data  
+  output$downloadData <- downloadHandler(  
+    filename = function() { "filtered_data.csv" },  
+    content = function(file) { write.csv(filtered_data(), file) }  
+  )  
+  
+  # Download Plot  
+  output$downloadPlot <- downloadHandler(  
+    filename = function() { "malaria_plot.png" },  
+    content = function(file) { ggsave(file, plot = last_plot()) }  
+  )  
+}  
+
+# Run the Shiny app  
+shinyApp(ui = ui, server = server)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
