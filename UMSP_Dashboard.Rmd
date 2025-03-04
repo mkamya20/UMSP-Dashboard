@@ -1,6 +1,6 @@
 ---
 title: "UMSP Dashboard"
-author: "UMSP Dashboard team builders (Moses, Isaiah, Eric and Shakira)"
+author: "UMSP Dashboard team builders (Moze, Isaiah, Eric and Shakira)"
 date: "2025-02-19"
 output: html_document
 ---
