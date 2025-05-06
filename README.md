@@ -1,4 +1,5 @@
 UMSP Data Summary and Variable Generation
+
 This is a description of the variables generated from the UMSP dataset for analysis. The dataset includes key metrics such as malaria incidence, proportions of suspected malaria cases, and testing rates over different regions and months. The following steps outline the process of calculating and summarizing these variables.
 1. Data Loading and Preprocessing
 The UMSP dataset was loaded from a Stata (.dta) file located on the desktop. The following parameters were used to load the data: The dataset was also preprocessed to ensure the 'Region' variable was treated as a factor, and a list of the unique levels of 'Region' was generated.
